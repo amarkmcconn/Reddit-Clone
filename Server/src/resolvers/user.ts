@@ -1,4 +1,13 @@
-import { Resolver, Mutation, InputType, Field, Ctx, Arg, ObjectType } from "type-graphql";
+import {
+  Resolver,
+  Mutation,
+  InputType,
+  Field,
+  Ctx,
+  Arg,
+  ObjectType,
+  Query,
+} from "type-graphql";
 import { MyContext } from "src/types";
 import { User } from "../entities/User";
 import argon2 from "argon2";
@@ -21,15 +30,26 @@ class FieldError {
 
 @ObjectType()
 class UserResponse {
-  @Field(() => [FieldError], {nullable: true})
+  @Field(() => [FieldError], { nullable: true })
   errors?: FieldError[];
 
-  @Field(() => User, {nullable: true})
+  @Field(() => User, { nullable: true })
   user?: User;
 }
 
 @Resolver()
 export class UserResolver {
+  @Query(() => User, { nullable: true })
+  async me(
+    @Ctx() { em, req }: MyContext) {
+    // you are not logged in
+    if (!req.session.userId) {
+      return null;
+    }
+    const user =  await em.findOne(User, { id: req.session.userId });
+    return user;
+  }
+
   @Mutation(() => UserResponse)
   async register(
     @Arg("options") options: UsernamePasswordInput,
@@ -39,80 +59,82 @@ export class UserResolver {
       return {
         errors: [
           {
-          field: "username", 
-          message: "username must be at least 3 characters"
-          }
+            field: "username",
+            message: "username must be at least 3 characters",
+          },
         ],
-      }
+      };
     }
 
     if (options.password.length <= 7) {
       return {
         errors: [
           {
-          field: "password", 
-          message: "password must be at least 7 characters"
-          }
+            field: "password",
+            message: "password must be at least 7 characters",
+          },
         ],
-      }
+      };
     }
     const hashedPassword = await argon2.hash(options.password);
-    const user = em.create(User, { 
+    const user = em.create(User, {
       username: options.username,
-      password: hashedPassword, 
-      createdAt: new Date(), 
-      updatedAt: new Date()
+      password: hashedPassword,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
     try {
-    await em.persistAndFlush(user);
+      await em.persistAndFlush(user);
     } catch (err) {
       // duplicate username error
       if (err.code === "23505" || err.detail.includes("already exists")) {
         return {
           errors: [
             {
-            field: "username", 
-            message: "username already taken"
+              field: "username",
+              message: "username already taken",
             },
           ],
         };
       }
     }
     return {
-      user
+      user,
     };
   }
 
   @Mutation(() => UserResponse)
   async login(
     @Arg("options") options: UsernamePasswordInput,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
     const user = await em.findOne(User, { username: options.username });
     if (!user) {
       return {
         errors: [
           {
-          field: "username", 
-          message: "username does not exist"
-          }
+            field: "username",
+            message: "username does not exist",
+          },
         ],
-      }
+      };
     }
     const valid = await argon2.verify(user.password, options.password);
     if (!valid) {
       return {
         errors: [
           {
-          field: "username", 
-          message: "incorrect password"
-          }
+            field: "username",
+            message: "incorrect password",
+          },
         ],
-      }
+      };
     }
 
-    return { 
-      user, 
+    req.session.userId = user.id;
+
+    return {
+      user,
     };
   }
 }
