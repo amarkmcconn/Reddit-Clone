@@ -3,25 +3,39 @@ import { Formik, Form } from "formik";
 import {
   Box,
   Button,
-  FormControl,
-  FormErrorMessage,
-  FormLabel,
-  Input,
 } from "@chakra-ui/react";
 import { Wrapper } from "../components/Wrapper";
 import { DarkModeSwitch } from "../components/DarkModeSwitch";
 import { InputField } from "../components/InputField";
+import { useMutation } from "urql";
 
 interface registerProps {}
 
+const REGISTER_MUTATION = `
+mutation Register($username: String!, $password: String!) {
+  register(options: { username: $username, password: $password }) {
+    user {
+      id
+      username
+    }
+    errors {
+      field
+      message
+    }
+  }
+}
+`;
+
+
 const Register: React.FC<registerProps> = ({}) => {
+  const [, register] = useMutation(REGISTER_MUTATION);
   return (
     <Wrapper variant="small">
       <DarkModeSwitch />
       <Formik
         initialValues={{ username: "", password: "" }}
         onSubmit={(values) => {
-          console.log(values);
+          return register(values);
         }}
       >
         {({ isSubmitting }) => (

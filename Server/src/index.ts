@@ -18,15 +18,27 @@ const main = async () => {
 
   const app = express();
   app.set("trust proxy", process.env.NODE_ENV !== "production");
-  app.set("Access-Control-Allow-Origin", "https://studio.apollographql.com");
-  app.set("Access-Control-Allow-Credentials", true);
+  // app.set("Access-Control-Allow-Origin", "http://localhost:3000");
+  // app.set("Access-Control-Allow-Credentials", true);
   const RedisStore = connectRedis(session);
   const redisClient = redis.createClient();
-  const cors = {
-    origin: "https://studio.apollographql.com",
-    credentials: true,
-  };
- 
+  // const cors = {
+  //   origin: ["https://studio.apollographql.com", "http://localhost:3000"],
+  //   credentials: true,
+  // };
+
+  // app.use(
+  //   "/graphql",
+  //   cors<cors.CorsRequest>({
+  //     origin: [
+  //       "http://localhost:3000",
+  //       "https://studio.apollographql.com",
+  //       "http://localhost:4000/graphql",
+  //     ],
+  //     credentials: true,
+  //   })
+  // );
+
   app.use(
     session({
       name: "qid",
@@ -55,7 +67,17 @@ const main = async () => {
   });
   // need to await this because middleware is async
   await apolloServer.start();
-  apolloServer.applyMiddleware({ app, cors });
+
+  const corsOptions = { 
+    origin: [
+      "http://localhost:3000",
+      "https://studio.apollographql.com",
+      "http://localhost:4000/graphql",
+    ],
+    credentials: true
+  };
+
+  apolloServer.applyMiddleware({ app, cors: corsOptions, path: "/graphql" });
 
   app.listen(4000, () => {
     console.log(" 🚀 ~ server started on localhost: 4000");
